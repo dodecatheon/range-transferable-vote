@@ -1,0 +1,267 @@
+Range Transferable Vote (RTV), a PR extension of Range Voting.
+
+Copyright (C) 2011,  Louis G. "Ted" Stern
+
+This code is was inspired by the Approval Transferable Vote method
+described by Jameson Quinn in the following posting:
+
+http://www.mail-archive.com/election-methods@lists.electorama.com/msg07066.html
+
+I have generalized and extended Approval Transferable Vote so it applies to
+Range scores and reduces to Range Voting in the single-winner case.
+
+Differences from Approval Transferable Vote:
+
+ * Quinn uses an over-quota transfer factor that is similar to that used
+   in Single Transferable Vote.
+   
+   In RTV, I extend this to take account of the portion of the seat-winner's
+   score that was contributed by ballots with no other standing candidates
+   available for transfer.  This reduces vote loss and is a disincentive
+   against truncation.
+
+ * Quinn's Approval Transferable Vote makes its over-quota transfer based
+   on a whole approval vote.
+
+   RTV increases the amount of transfer in proportion to the reduced ballot
+   score for the winner.
+
+   In other words, as a ballot's score for the seat winner goes toward zero,
+   the amount of strength lost by voting for that candidate also goes to zero.
+
+   This reduces the vote-loss penalty for giving partial approval to compromise
+   candidates, and is another disincentive against truncation.
+
+ * This implementation of RTV has options to use four different quotas:  
+   - Hare  = Nvotes / Nseats
+   
+   - Droop = floor( Nvotes / (Nseats + 1.0)) + 1.0
+
+   - A fractional version of Droop that is slightly smaller than
+     traditional Droop in some cases, but still preserves the Droop majority
+     constraint and is identical for single-winner:
+
+     Droop-fractional = (floor((Nvotes * Nseats) / (Nseats + 1.0)) + 1.0) / Nseats
+
+   - Hagenbach-Bischoff, the quota used by Quinn = Nvotes / (Nseats + 1.0)
+
+Range scale:
+
+I prefer a range of scores from 0 to 10, and would recommend that for multi-winner
+elections, the range scores be limited to those above 50% approval = Neutral.
+However, RTV works with any range scale without constraint.
+
+In Majority Judgment, the scores 10, 9, 8, 7, 6 can be interpreted as
+the named grades "Excellent", "Very Good", "Good", "Acceptable", "Poor",
+"Reject", or letter grades A+, A, B, C, D, F; or percentage of alignment
+with the voter, 100%, 90%, 80%, 70%, 60%, 0.
+
+I believe that the named grades encourage voters to give their sincere
+preferences.
+
+In a multi-winner election, we are striving to find the candidates who best
+align with factions of voters, and with sufficient seats, small factions
+should be represented, so there is less of a reason to give votes near
+the Strongly Reject level (10% to 20%).
+
+----------------
+
+Differences from STV:
+
+  In STV,
+
+  * There must be exactly one candidate at each rank.
+
+  * There can be no gaps in ranks, though lower ranks do not have to be
+    filled in.
+
+  * The only way for lower ranked candidates to be counted is for
+    candidates in higher ranks to be eliminated or seated, at which
+    time lower ranks are moved up one rank.
+
+  * When no candidate's score exceeds the quota, the only way to
+    increase the vote strength of other candidates is to eliminate the
+    candidate with lowest top-rank score and move other candidates on
+    that ballot up one rank.
+
+  * STV passes the "Later-no-harm" criterion.  That is, votes at lower ranks
+    have no effect unless all higher-ranked alternatives have been seated or
+    eliminated
+
+  * STV is vulnerable to the "no-show" paradox, in which some voters might
+    experience a more favorable result if they stay home.
+
+  In RTV,
+
+  * Equal rating is allowed.
+
+  * It is not necessary to fill in a candidate for each rating level.
+
+  * Unlike STV, lower ratings are always taken into account.  So unlike STV,
+    it is possible that a voter's lower-rated preferences could prevent their
+    higher-rated preferences from winning a seat.  So RTV does not pass the
+    "Later-no-harm" criterion.
+    
+    However, unlike STV, candidates are never eliminated, so a lower rating
+    for an alternative never causes that alternative to be eliminated
+    completely, so there is less incentive to artificially raise a second-choice
+    alternative to prevent it from being eliminated.
+
+  * RTV passes Woodall's "mono-add-top" criterion, which means that it never
+    suffers from the no-show paradox.  There is no way that adding more
+    ballots with top rating for a favorite candidate could cause that
+    candidate to lose.
+
+Background:
+
+Quinn proposed ATV as a stepping stone to a Bucklin-like transferable vote method.
+
+Unfortunately, Bucklin methods are not monotonic, and there could be some strange
+behavior in some cases.
+
+I am proposing RTV as a Proportional alternative that retains monotonicity, avoids
+the no-show paradox, and in the single-winner limit reduces to a good single-winner
+method that can process ratings ballots.
+
+Glossary, following the analogy of musical chairs:
+
+Seated:      A candidate has met the quota and won a seat.
+
+Standing:    Candidate has not met quota and is still in the running.
+
+Locked:      A candidate's vote becomes locked on a single ballot when the
+             ballot has only one standing candidate left.
+
+             If that single candidate is seated, there are no other
+             candidates to transfer the overquota vote to.
+
+             If a candidate's score is locked on a ballot on the first
+             round, the ballot is called a bullet vote -- the voter
+             picked a single candidate.
+
+             But it can also happen when all other choices on the
+             ballot have already been seated.  Then if candidate 'A'
+             receives an overvote and the ballot is removed entirely,
+             the ballot's excess score for A is not transferable.
+
+Locksums:    The sum of locked scores for a candidate determine how much
+             of the candidate's total score can be rescaled and
+             redistributed in the event of being seated with an
+             overquota.
+
+Rescaled
+weight:      As ballots "get their way" by seating a candidate with a
+             total approval score over the quota, we multiply the weight
+             of that ballot by a factor to transfer the over-quota portion
+             of the vote to other candidates on that ballot.
+
+beta[score]: The normalized approval fraction corresponding to a given
+             rating score.
+
+	     beta[0] = 0.0, beta[max_score] = 1.0, beta[i] = i / max.
+
+Algorithm:
+
+There are N valid ballots and M seats to fill.
+
+Begin with threshold at max score and rescale factor at 1.0 for each
+ballot.  Set the quota according to the desired option.
+
+Repeat until M candidates have been seated or threshold cannot be
+lowered any further:
+
+  Compute weighted approval score:
+    For each candidate,
+          total[cand] += beta[score[cand]] * rescale[ballot]
+
+  Seat candidate with highest weighted total score
+
+  Rescale unlocked ballots containing that candidate to transfer
+  over-quota vote, by multiplying the ballot strength by F, where
+
+     Q = quota,
+
+     T = Total approval for winner
+
+     L = locked approval for winner
+
+     QML = max(Q - L, eps)
+
+     TML = max(max(T,Q) - L, eps)
+
+     F[score] = (TML - beta[score] * QML) / TML
+
+The Factor formula above handles the contingency that the total approval score
+has dropped below the quota.  In that case, the rescale Factor is
+zero for ballots on which the score is max, and higher for ballots with lower scores
+for the seat winner.
+
+Usage:
+
+There are some example csv ballots available in my Cumulative Tranferable Vote
+project.  I'm duplicating them here.
+
+Here's how to run them:
+
+June 2011 example from
+http://rangevoting.org/June2011RealWorldRRVvotes.txt
+
+  ./rtv.py -n 9 -m 9 -q droop -i june2011.csv -o june2011_output.csv
+
+Stephen Unger's STV example, from
+http://rangevoting.org/STVPRunger.html
+
+  ./rtv.py -n 3 -m 4 -q droop -i unger.csv -o unger_output.csv
+
+A sample ballot from the CTV project:
+
+  ./rtv.py -n 5 -m 10 -q droop -i new_sample.csv -o new_sample_output.csv
+
+The csv output file contains a table with the total weighted approval scores
+Each score is listed as
+
+   #.#### (position)
+
+where the number in parentheses is the rank of the approval score.
+
+Excluding candidates:
+
+You can test an election with one or more candidates excluded using the Unix
+tool 'cut'.  Here's the first example, excluding candidate '108':
+
+  cut -f1-7,8- -d, june2011.csv | \
+  ./rtv.py -n 9 -m 9 -q droop -i - -o june2011_excluding_108_output.csv
+
+
+Running the code:
+
+If you don't have a python interpreter, you can run the code via the web,
+using
+
+   http://ideone.com
+
+Select Python from the left sidebar.
+
+Cut and paste everything in the rtv.py file, from from the "BEGIN cut and
+paste line" to "END cut and paste line" and insert it into the web page's
+source code textarea.
+
+In the very same textarea, following the source you've just cut and pasted
+above, enter the appropriate input to run your example.  To run the
+june2011.csv input, for example, you enter the following two statements:
+
+
+election = Election(nseats=9,
+                    max_score=9,
+                    csv_input='-',
+                    csv_output='-',
+                    qtype='droop')
+
+election.run_election()
+
+
+Click where it says "click here to enter input (stdin) ...", and paste in your
+comma-separated variable input.  For this example, use text from the
+june2011.csv file.
+
+Then click on the Submit button on the lower left.
