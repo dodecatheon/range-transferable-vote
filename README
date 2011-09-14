@@ -14,7 +14,7 @@ Differences from Approval Transferable Vote:
 
  * Quinn uses an over-quota transfer factor that is similar to that used
    in Single Transferable Vote.
-   
+
    In RTV, I extend this to take account of the portion of the seat-winner's
    score that was contributed by ballots with no other standing candidates
    available for transfer.  This reduces vote loss and is a disincentive
@@ -32,9 +32,9 @@ Differences from Approval Transferable Vote:
    This reduces the vote-loss penalty for giving partial approval to compromise
    candidates, and is another disincentive against truncation.
 
- * This implementation of RTV has options to use four different quotas:  
+ * This implementation of RTV has options to use four different quotas:
    - Hare  = Nvotes / Nseats
-   
+
    - Droop = floor( Nvotes / (Nseats + 1.0)) + 1.0
 
    - A fractional version of Droop that is slightly smaller than
@@ -101,27 +101,32 @@ Differences from STV:
     it is possible that a voter's lower-rated preferences could prevent their
     higher-rated preferences from winning a seat.  So RTV does not pass the
     "Later-no-harm" criterion.
-    
+
     However, unlike STV, candidates are never eliminated, so a lower rating
     for an alternative never causes that alternative to be eliminated
     completely, so there is less incentive to artificially raise a second-choice
     alternative to prevent it from being eliminated.
 
-  * RTV passes Woodall's "mono-add-top" criterion, which means that it never
-    suffers from the no-show paradox.  There is no way that adding more
-    ballots with top rating for a favorite candidate could cause that
-    candidate to lose.
+  * RTV passes Woodall's "mono-add-top" criterion in the single-winner limit,
+    so it suffers less than STV from the "no-show paradox".  It is suspected
+    that there is no way for any multi-winner method to avoid participation
+    failures [I would welcome a proof or a counter-example!], but RTV's
+    vulnerability would arise from the order of seating, and without
+    elimination as in STV, there are fewer ways for participation failures to
+    occur.
 
 Background:
 
-Quinn proposed ATV as a stepping stone to a Bucklin-like transferable vote method.
+Quinn proposed Approval Transferable Vote (ATV) as a stepping stone to a
+Bucklin-like multi-winner method.
 
-Unfortunately, Bucklin methods are not monotonic, and there could be some strange
-behavior in some cases.
+Unfortunately, Bucklin methods are not monotonic, even in the single-winner
+case, nor do they pass the Indepence from Irrelevant Alternatives criterion.
 
-I am proposing RTV as a Proportional alternative that retains monotonicity, avoids
-the no-show paradox, and in the single-winner limit reduces to a good single-winner
-method that can process ratings ballots.
+Therefore, I've now taken a different route from ATV to RTV, a method that
+reduces to Range Voting for single-winner (and *is* monotonic and satisfies
+IIA in that case) and retains many of Range Voting's desirable properties for
+multi-winner elections.
 
 Glossary, following the analogy of musical chairs:
 
