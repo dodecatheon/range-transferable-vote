@@ -195,19 +195,19 @@ lowered any further:
 
      TML = max(max(T,Q) - L, eps)
      
-     Fraction of unlocked score score sum used up, U, on each ballot voting
-     for winner:
+     Fraction of winner's total score sum used up, U, from all unlocked
+     ballots voting for winner:
 
      U = QML / TML
 
-     Over-quota vote transfer rescale factor, F, applied to ballot scoring
-     winner at rating 'score':
+     Over-quota vote transfer rescale factor, F, applied to each previously
+     unlocked ballot giving winner a rating of 'score':
 
      F[score] = 1.0 - beta[score] * U
 
-The over-quota transfer rescale formula above handles the contingency that
-the total approval score sum has dropped below the quota.  In that case, F[max]
-= 0, and F[score < max] is greater than zero and less than 1.0.
+The 'used-up' formula for U above handles situations where the total
+approval score sum has dropped below the quota.  In that case, F[max] =
+0, and F[score < max] is greater than zero and less than 1.0.
 
 Usage:
 
