@@ -176,7 +176,8 @@ Repeat until M candidates have been seated or threshold cannot be
 lowered any further:
 
   Compute weighted approval score:
-    For each candidate,
+    For eacm ballot:
+       For each standing candidate on that ballot:,
           total[cand] += beta[score[cand]] * rescale[ballot]
 
   Seat candidate with highest weighted total score
@@ -186,20 +187,27 @@ lowered any further:
 
      Q = quota,
 
-     T = Total approval for winner
+     T = Total weighted approval score sum for winner
 
-     L = locked approval for winner
+     L = locked weighted approval score sum for winner
 
-     QML = max(Q - L, eps)
+     QML = max(Q - L, 0.0)
 
      TML = max(max(T,Q) - L, eps)
+     
+     Fraction of unlocked score score sum used up, U, on each ballot voting
+     for winner:
 
-     F[score] = (TML - beta[score] * QML) / TML
+     U = QML / TML
 
-The Factor formula above handles the contingency that the total approval score
-has dropped below the quota.  In that case, the rescale Factor is
-zero for ballots on which the score is max, and higher for ballots with lower scores
-for the seat winner.
+     Over-quota vote transfer rescale factor, F, applied to ballot scoring
+     winner at rating 'score':
+
+     F[score] = 1.0 - beta[score] * U
+
+The over-quota transfer rescale formula above handles the contingency that
+the total approval score sum has dropped below the quota.  In that case, F[max]
+= 0, and F[score < max] is greater than zero and less than 1.0.
 
 Usage:
 
@@ -208,15 +216,20 @@ project.  I'm duplicating them here.
 
 Here's how to run them:
 
-June 2011 example from
-http://rangevoting.org/June2011RealWorldRRVvotes.txt
+June 2011 example from http://rangevoting.org/June2011RealWorldRRVvotes.txt
 
   ./rtv.py -n 9 -m 9 -q droop -i june2011.csv -o june2011_output.csv
 
-Stephen Unger's STV example, from
-http://rangevoting.org/STVPRunger.html
+Stephen Unger's STV example, from http://rangevoting.org/STVPRunger.html
 
-  ./rtv.py -n 3 -m 4 -q droop -i unger.csv -o unger_output.csv
+  ./rtv.py -n 3 -m 8 -q droop -i unger.csv -o     unger_output.csv
+  ./rtv.py -n 3 -m 8 -q droop -i unger_new.csv -o unger_new_output.csv
+
+[Note:  I've adjusted ratings so that all non-zero scores are above neutral]
+
+In this example, you can see that by removing two votes that score E highest,
+the winner of the last seat changes from E to B.  There is no "no-show" paradox
+in this behavior, unlike the STV example illustrated on the web page. 
 
 A sample ballot from the CTV project:
 
@@ -234,7 +247,7 @@ Excluding candidates:
 You can test an election with one or more candidates excluded using the Unix
 tool 'cut'.  Here's the first example, excluding candidate '108':
 
-  cut -f1-7,8- -d, june2011.csv | \
+  cut -f1-7,9- -d, june2011.csv | \
   ./rtv.py -n 9 -m 9 -q droop -i - -o june2011_excluding_108_output.csv
 
 

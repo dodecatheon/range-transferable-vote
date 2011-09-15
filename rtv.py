@@ -331,18 +331,22 @@ standing candidate, and keep track of weighted total vote.
              win_score,
              locksum) = self.weighted_scoresum(totals, locksums)
 
-            qml = max(self.quota - locksum, eps)
-	    tml = max(max(win_score, self.quota) - locksum, eps)
+            # fraction used up = (Q-L)/(T-L),
+            # constrained to lie between 0.0 and 1.0
+            used_up_fraction = \
+                max(self.quota - locksum, 0.0) / \
+                max(max(win_score, self.quota) - locksum, eps)
 
-	    factors = [1.0]
-	    for i in xrange(1, self.n_score):
-	        factor = (tml - self.beta[i] * qml) / tml
-		factors.append(factor)
+            factors = [1.0 - self.beta[i] * used_up_fraction
+                       for i in xrange(self.n_score)]
 
             vote_count -= min(max(locksum, self.quota),win_score)
 
             self.seated.add(winner)
-            self.ordered_seated.append((winner,win_score,locksum))
+            self.ordered_seated.append((winner,
+                                        win_score,
+                                        locksum,
+                                        used_up_fraction))
             self.standing.remove(winner)
 
             n_seated += 1
@@ -351,16 +355,13 @@ standing candidate, and keep track of weighted total vote.
 
             if not terse:
 
-	    	factor_pairs = ["%d: %.5g" % (i, factor)
-		                for i, factor in enumerate(factors)]
-
                 print "Candidate %s seated in position %i" % ( winner,
                                                                n_seated), \
                     ", Score sum = %.5g" % win_score, \
                     ", Quota = %.5g" % self.quota, \
                     ", Locksum = %.5g" % locksum, \
-                    ", Rescale factors = ", ', '.join(factor_pairs[self.n_score:0:-1])
-                print ""
+                    ", Score used = %3.2f%%" % (used_up_fraction * 100.0), \
+                    "\n"
 
         print "Winning set in order seated =",
         print "{" + ','.join([self.ordered_seated[i][0]
