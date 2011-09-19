@@ -24,35 +24,50 @@ DEFAULT_NSEATS = 7
 def reverse_sort_dict(d):
     return sorted(d.iteritems(), key=itemgetter(1), reverse=True)
 
-qtypes = ['hare', 'droop', 'droop-fractional', 'hagenbach-bischoff']
+qtypes = ['droop',
+          'hare',
+          'droop-nseats',
+          'droop-max-score',
+          'hagenbach-bischoff']
 
 # Set up for Hare or Droop quotas:
-def calc_quota(n, nseats=DEFAULT_NSEATS, qtype='droop'):
-    # Hare quota = Nvotes / Nseats
-    # Droop quota = int(Nvotes / (Nseats + 1)) + 1
-    # Droop fractional = Droop quota with Nvotes*Nseats votes, then
-    #                    dividing by Nseats.
-    # Hagenbach-Bischoff = Nvotes / (Nseats + 1)
+def calc_quota(n,
+               nseats=DEFAULT_NSEATS,
+               max_score=DEFAULT_MAX_SCORE,
+               qtype='droop'):
+    """\
+    Return the quota based on qtype:
+
+    'droop'              => Droop = int(Nvotes / (Nseats + 1)) + 1
+    'hare'               => Hare  = Nvotes / Nseats
+    'droop-nseats'       => Droop with Nvotes*Nseats votes,
+                            then divide by Nseats.
+    'droop-max-score'    => Droop with Nvotes*max_score votes,
+                            then divide by max_score
+    'hagenbach-bischoff' => Nvotes / (Nseats + 1)
+    """
 
     fn = float(n)
     fs = float(nseats)
+    fm = float(max_score)
     fsp1 = fs + 1.0
 
     # We implement a CASE switch construction using a dict:
     return {'droop':              (float(int(fn/fsp1)) + 1.0),
             'hare':               (fn/fs),
-            'droop-fractional':   ((float(float(int(fn*fs/fsp1)) + 1.0))/fs),
+            'droop-nseats':       ((float(float(int(fn*fs/fsp1)) + 1.0))/fs),
+            'droop-max-score':    ((float(float(int(fn*fm/fsp1)) + 1.0))/fm),
             'hagenbach-bischoff': (fn/fsp1)}[qtype]
 
 class Ballot(dict):
-    def __init__(self,csv_string='',cand_list=[]):
+    def __init__(self,csv_string='',cand_list=[],offset_score=0):
         # Parse the csv_string
         scores = []
         for i, v in enumerate(csv_string.rstrip().split(',')):
             if v:
                 intv = int(v)
                 if intv:
-                    scores.append((cand_list[i],intv))
+                    scores.append((cand_list[i],intv+offset_score))
         # Now initialize with the list of 2-tuples
         dict.__init__(self,scores)
 
@@ -66,8 +81,8 @@ class Election(object):
                  csv_input=None,
                  csv_output=None,
                  qtype='droop',
-                 max_score=DEFAULT_MAX_SCORE,
-                 nseats=DEFAULT_NSEATS):
+                 nseats=DEFAULT_NSEATS,
+                 offset_score=0):
         "Initialize from a list of ballots or a CSV input file"
 
         # Number of seats to fill:
@@ -90,9 +105,18 @@ class Election(object):
         self.candidates = candidates
         if csv_input:
             if csv_input == '-':
-                self.csv_ballots(stdin=True)
+                self.csv_ballots(stdin=True,
+                                 offset_score=offset_score)
             else:
-                self.csv_ballots(filename=csv_input)
+                self.csv_ballots(filename=csv_input,
+                                 offset_score=offset_score)
+
+        # Determine maximum score:
+        max_score = max(v
+                        for ballot in self.ballots
+                        for v in ballot.values())
+
+        print "Maximum score found in ballots = %d\n" % max_score
 
         # Initialize lists and sets of candidates:
 
@@ -116,7 +140,8 @@ class Election(object):
 
         # Calculate quota
         self.quota = calc_quota(self.nvotes,
-                                self.nseats,
+                                nseats=self.nseats,
+                                max_score=self.max_score,
                                 qtype=self.qtype)
 
         # Set up initial line of CSV output file:
@@ -141,7 +166,8 @@ class Election(object):
 
     def csv_ballots(self,
                     filename=None,
-                    stdin=False):
+                    stdin=False,
+                    offset_score=0):
         "Read ballots from a csv file.  First line is names of candidates."
         if stdin:
             f = sys.stdin
@@ -157,7 +183,7 @@ class Election(object):
 	# "None of the Above".  Depending on how votes are counted, this could
 	# force a run-off.
         for line in f:
-            ballot = Ballot(line,keys)
+            ballot = Ballot(line,keys,offset_score)
 	    self.ballots.append(ballot)
 
         if not stdin:
@@ -401,7 +427,6 @@ june2011.csv input, for example, you enter the following two statements:
 
 
 election = Election(nseats=9,
-                    max_score=9,
                     csv_input='-',
                     csv_output='-',
                     qtype='droop')
@@ -449,25 +474,34 @@ for the respective candidates as ballots on following lines.
                       help=fill(dedent("""\
                       Number of winning seats for election.  [Default: 7]""")))
 
-    parser.add_option('-m',
-                      '--max-score',
-                      type=int,
-                      default=5,
-                      help=fill(dedent("""\
-                      Maximum score.  [Default: %d]""" % DEFAULT_MAX_SCORE )))
-
     parser.add_option('-q',
                       '--quota-type',
                       type='string',
                       default='droop',
                       help=fill(dedent("""\
-                      Quota type used in election.  'hare' = Hare =
-                      Number of ballots divided by number of seats.
-                      'droop' = Droop = Nballots /(Nseats + 1) + 1, dropping
-                      fractional part.  'droop-fractional' =
-                      (Nseats*Nballots)/(Nseats+1) + 1, drop fractional part,
-                      then divide by Nseats.  It reduces to Droop when Nseats
-                      is one. 'hagenbach-bischoff' = Nballots / (Nseats + 1).
+                      Quota type used in election.
+
+                      'droop' = Droop   = Nballots /(Nseats + 1) + 1,
+                                          dropping fractional part.
+
+                      'hare'  = Hare    = Number of ballots divided by number
+                                          of seats.
+
+                      'droop-nseats'    = Droop based on Nballots * Nseats
+                                          votes, then divide by Nseats.
+                                          Reduces to traditional Droop
+                                          when Nseats is 1.
+
+                      'droop-max-score' = Droop based on Nballots * max_score
+                                          votes, then divide by max_score.
+
+                      'hagenbach-bischoff' = Nballots / (Nseats + 1).
+                                             Technically, this may allow
+                                             exactly 50% of the ballots to
+                                             select a majority of seats,
+                                             or the left-out votes could
+                                             meet quota for an extra seat.
+
                       [Default: droop]""")))
 
     parser.add_option('-i',
@@ -508,6 +542,12 @@ for the respective candidates as ballots on following lines.
                       action='store_true',
                       default=False,
                       help="Turn on debug mode printout.  [Default:  False]")
+
+    parser.add_option('-f',
+                      '--offset-score',
+                      type=int,
+                      default=0,
+                      help="Increase all non-zero input scores by OFFSET_SCORE.  [Default:  0]")
 
     opts, args = parser.parse_args()
 
@@ -557,10 +597,10 @@ for the respective candidates as ballots on following lines.
             sys.exit(1)
 
     election = Election(nseats=opts.nseats,
-                        max_score=opts.max_score,
                         csv_input=csv_input,
                         csv_output=csv_output,
-                        qtype=opts.quota_type)
+                        qtype=opts.quota_type,
+                        offset_score=opts.offset_score)
 
     election.run_election(verbose=opts.verbose,
                           terse=opts.terse,

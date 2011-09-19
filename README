@@ -2,15 +2,28 @@ Range Transferable Vote (RTV), a PR extension of Range Voting.
 
 Copyright (C) 2011,  Louis G. "Ted" Stern
 
-This code is was inspired by the Approval Transferable Vote method
-described by Jameson Quinn in the following posting:
+This code is was inspired by the Droop-quota-based Approval Transferable Vote
+method described by Jameson Quinn in the following posting:
 
 http://www.mail-archive.com/election-methods@lists.electorama.com/msg07066.html
 
-I have generalized and extended Approval Transferable Vote so it applies to
-Range scores and reduces to Range Voting in the single-winner case.
+I have generalized and extended Approval Transferable Vote so it can be used
+with full ratings ballots and reduces to Range Voting in the single-winner
+case.
 
-Differences from Approval Transferable Vote:
+[footnote: Warren Smith proposed another PR method based on Range Voting that
+reweights votes proportionally, RRV:
+
+http://rangevoting.org/RRV.html
+
+Quinn discusses the difference between quota-based and proportionally-based
+reweighting methods here:
+
+https://groups.google.com/group/electionscience/browse_thread/thread/6888fba595610d47/6f123e0a2b59fe1d
+
+... end footnote]
+
+Differences between RTV and Quinn's Approval Transferable Vote:
 
  * Quinn uses an over-quota transfer factor that is similar to that used
    in Single Transferable Vote.
@@ -32,24 +45,54 @@ Differences from Approval Transferable Vote:
    This reduces the vote-loss penalty for giving partial approval to compromise
    candidates, and is another disincentive against truncation.
 
- * This implementation of RTV has options to use four different quotas:
-   - Hare  = Nvotes / Nseats
+ * This implementation of RTV has options to use five different quotas:
 
    - Droop = floor( Nvotes / (Nseats + 1.0)) + 1.0
 
-   - A fractional version of Droop that is slightly smaller than
-     traditional Droop in some cases, but still preserves the Droop majority
-     constraint and is identical for single-winner:
+   - Hare  = Nvotes / Nseats
 
-     Droop-fractional = (floor((Nvotes * Nseats) / (Nseats + 1.0)) + 1.0) / Nseats
+   - Droop-nseats = Droop quota, based on Nvotes * Nseats votes, then divided
+                    by Nseats.  It is slightly smaller than traditional Droop
+                    in some cases, but still preserves the Droop majority
+                    constraint and is identical for single-winner.
+
+                    It is could be considered the Droop quota if you are
+                    counting in Cumulative Vote style, with Nseats votes per
+                    voter.
+
+   - Droop-max-score =
+
+                    Droop quota, based on Nvotes * max_score votes, then
+                    divided by max_score.
+
+                    It is the Droop quota for total scores in Range Voting
+                    style, adding up scores per candidate from every ballot,
+                    then transformed to ballot-count style.
+
+                    In the single winner case, it would effectively require
+                    the same number of votes to exceed the quota as traditional
+                    Droop.
 
    - Hagenbach-Bischoff, the quota used by Quinn = Nvotes / (Nseats + 1.0)
 
+                    The H-B quota may lead to issues such as
+
+                    (1) a non-majority (less than 50% + one vote) controlling
+                        half of the seats, or
+
+                    (2) enough unused votes left over to elect another seat.
+
+                    Neither of these can occur with Droop or any of its
+                    variants.
+
+   The default is traditional Droop, to follow standard STV practice.
+
 Range scale:
 
-I prefer a range of scores from 0 to 10, and would recommend that for multi-winner
-elections, the range scores be limited to those above 50% approval = Neutral.
-However, RTV works with any range scale without constraint.
+I prefer a range of scores from 0 to 10, and would recommend that for
+multi-winner elections, the range scores be limited to those above 50%
+approval = Neutral.  However, RTV works with any range scale without
+constraint.
 
 In Majority Judgment, the scores 10, 9, 8, 7, 6 can be interpreted as
 the named grades "Excellent", "Very Good", "Good", "Acceptable", "Poor",
@@ -61,8 +104,13 @@ preferences.
 
 In a multi-winner election, we are striving to find the candidates who best
 align with factions of voters, and with sufficient seats, small factions
-should be represented, so there is less of a reason to give votes near
-the Strongly Reject level (10% to 20%).
+should be represented, so there is less of a reason to give votes near the
+Strongly Reject level (10% to 20%).  Therefore, I would encourage voters to
+use only the top half of the available range for multi-winner elections.
+
+Since some ratings ballots may use a shortened range, the script has the
+option to add an offset to non-zero scores.  For more information, see "Usage"
+below.
 
 ----------------
 
@@ -169,16 +217,19 @@ Algorithm:
 
 There are N valid ballots and M seats to fill.
 
-Begin with threshold at max score and rescale factor at 1.0 for each
-ballot.  Set the quota according to the desired option.
+Begin with the rescale factor at 1.0 for each ballot.  Set the quota according
+to the desired option.
 
 Repeat until M candidates have been seated or threshold cannot be
 lowered any further:
 
   Compute weighted approval score:
-    For eacm ballot:
+    For each ballot:
        For each standing candidate on that ballot:,
           total[cand] += beta[score[cand]] * rescale[ballot]
+
+          if only one standing candidate on the ballot,
+             locked[cand] += beta[score[cand] * rescale[ballot]
 
   Seat candidate with highest weighted total score
 
@@ -194,7 +245,7 @@ lowered any further:
      QML = max(Q - L, 0.0)
 
      TML = max(max(T,Q) - L, eps)
-     
+
      Fraction of winner's total score sum used up, U, from all unlocked
      ballots voting for winner:
 
@@ -218,22 +269,22 @@ Here's how to run them:
 
 June 2011 example from http://rangevoting.org/June2011RealWorldRRVvotes.txt
 
-  ./rtv.py -n 9 -m 9 -q droop -i june2011.csv -o june2011_output.csv
+  ./rtv.py -n 9 -q droop -i june2011.csv -o june2011_output.csv
 
 Stephen Unger's STV example, from http://rangevoting.org/STVPRunger.html
 
-  ./rtv.py -n 3 -m 8 -q droop -i unger.csv -o     unger_output.csv
-  ./rtv.py -n 3 -m 8 -q droop -i unger_new.csv -o unger_new_output.csv
+  ./rtv.py -n 3 -q droop -i unger.csv -o     unger_output.csv
+  ./rtv.py -n 3 -q droop -i unger_new.csv -o unger_new_output.csv
 
 [Note:  I've adjusted ratings so that all non-zero scores are above neutral]
 
 In this example, you can see that by removing two votes that score E highest,
 the winner of the last seat changes from E to B.  There is no "no-show" paradox
-in this behavior, unlike the STV example illustrated on the web page. 
+in this behavior, unlike the STV example illustrated on the web page.
 
 A sample ballot from the CTV project:
 
-  ./rtv.py -n 5 -m 10 -q droop -i new_sample.csv -o new_sample_output.csv
+  ./rtv.py -n 5 -q droop -i new_sample.csv -o new_sample_output.csv
 
 The csv output file contains a table with the total weighted approval scores
 Each score is listed as
@@ -248,8 +299,27 @@ You can test an election with one or more candidates excluded using the Unix
 tool 'cut'.  Here's the first example, excluding candidate '108':
 
   cut -f1-7,9- -d, june2011.csv | \
-  ./rtv.py -n 9 -m 9 -q droop -i - -o june2011_excluding_108_output.csv
+  ./rtv.py -n 9 -q droop -i - -o june2011_excluding_108_output.csv
 
+Increasing scores:
+
+For multi-winner, it doesn't make sense to rank your choices unless you
+approve of them at some level.
+
+However, the scores indicating rank may truncate any preferences below neutral
+to zero.
+
+Say you have a set of ballots with scores between 0 and 5; 1 indicating slight
+approval, and 5 indicating strong approval.  You may wish to adjust the
+non-zero scores into the range 5 through 9 (in a zero to 9 range) or 6 through
+10 (in a zero through 10 range).  To do this, use the --offset-scores or -f
+option:
+
+   -f 4        # for range = 0:9
+   -f 5        # for range = 0:10
+
+Then all of your non-zero input scores would be adjusted upward by the
+respective number.
 
 Running the code:
 
@@ -270,7 +340,6 @@ june2011.csv input, for example, you enter the following two statements:
 
 
 election = Election(nseats=9,
-                    max_score=9,
                     csv_input='-',
                     csv_output='-',
                     qtype='droop')
