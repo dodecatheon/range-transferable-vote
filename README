@@ -25,25 +25,25 @@ https://groups.google.com/group/electionscience/browse_thread/thread/6888fba5956
 
 Differences between RTV and Quinn's Approval Transferable Vote:
 
- * Quinn uses an over-quota transfer factor that is similar to that used
-   in Single Transferable Vote.
+ * Quinn uses an over-quota transfer factor that is identical to that used
+   implicitly by Single Transferable Vote.
 
-   In RTV, I extend this to take account of the portion of the seat-winner's
-   score that was contributed by ballots with no other standing candidates
-   available for transfer.  This reduces vote loss and is a disincentive
-   against truncation.
+   In RTV, I extend the over-quota rescaling factor to take account of the
+   portion of the seat-winner's score that was contributed by ballots with no
+   other standing candidates available for transfer.  This reduces vote loss
+   and is a disincentive against truncation.
 
  * Quinn's Approval Transferable Vote makes its over-quota transfer based
    on a whole approval vote.
 
-   RTV increases the amount of transfer in proportion to the reduced ballot
+   RTV increases the amount of transfer inversely in proportion to the ballot
    score for the winner.
 
    In other words, as a ballot's score for the seat winner goes toward zero,
    the amount of strength lost by voting for that candidate also goes to zero.
 
-   This reduces the vote-loss penalty for giving partial approval to compromise
-   candidates, and is another disincentive against truncation.
+   This reduces the vote-loss penalty for giving partial approval to
+   compromise candidates, and is another disincentive against truncation.
 
  * This implementation of RTV has options to use five different quotas:
 
@@ -134,7 +134,7 @@ Differences from STV:
 
   * STV passes the "Later-no-harm" criterion.  That is, votes at lower ranks
     have no effect unless all higher-ranked alternatives have been seated or
-    eliminated
+    eliminated.
 
   * STV is vulnerable to the "no-show" paradox, in which some voters might
     experience a more favorable result if they stay home.
@@ -152,8 +152,8 @@ Differences from STV:
 
     However, unlike STV, candidates are never eliminated, so a lower rating
     for an alternative never causes that alternative to be eliminated
-    completely, so there is less incentive to artificially raise a second-choice
-    alternative to prevent it from being eliminated.
+    completely.  Therefore, there is less incentive to artificially raise a
+    second-choice alternative to prevent it from being eliminated.
 
   * RTV passes Woodall's "mono-add-top" criterion in the single-winner limit,
     so it suffers less than STV from the "no-show paradox".  It is suspected
@@ -269,7 +269,20 @@ Here's how to run them:
 
 June 2011 example from http://rangevoting.org/June2011RealWorldRRVvotes.txt
 
-  ./rtv.py -n 9 -q droop -i june2011.csv -o june2011_output.csv
+  ./rtv.py -n 9 -q droop-max-score -i june2011.csv -o june2011_output.csv
+
+To duplicate the requirements of choosing 11 winners, you can do
+
+  ./rtv.py -n 11 -q droop-max-score -i june2011.csv -o june2011_output.csv
+
+In both these cases, I think it is preferable to use either Droop-nseats or
+Droop-max-score instead of standard Droop, because standard Droop has a quota
+of 4.0 in both the 9-winner and 11-winner case.  In other words, Droop is too
+granular when the quota is small.  With all Droop variants, the quota is 4 for
+9-winner case.  For Droop-nseats, the 11-winner quota is 3.2727..., and for
+Droop-max-score the quota is 3.33....
+
+
 
 Stephen Unger's STV example, from http://rangevoting.org/STVPRunger.html
 
@@ -293,6 +306,7 @@ Each score is listed as
 
 where the number in parentheses is the rank of the approval score.
 
+
 Excluding candidates:
 
 You can test an election with one or more candidates excluded using the Unix
@@ -300,6 +314,7 @@ tool 'cut'.  Here's the first example, excluding candidate '108':
 
   cut -f1-7,9- -d, june2011.csv | \
   ./rtv.py -n 9 -q droop -i - -o june2011_excluding_108_output.csv
+
 
 Increasing scores:
 
