@@ -97,8 +97,15 @@ class Election(object):
         # ------------------------------------------------------------
         # Absorb ballots, from input list and/or from file or stdin
 
+        self.max_score = 0
         if ballots:
             self.ballots = ballots
+
+            # Determine maximum score in existing ballots
+            self.max_score = max(v
+                                 for ballot in self.ballots
+                                 for v in ballot.values())
+            print "Max score found in existing ballots = %d" % self.max_score
         else:
             self.ballots = []
 
@@ -111,12 +118,8 @@ class Election(object):
                 self.csv_ballots(filename=csv_input,
                                  offset_score=offset_score)
 
-        # Determine maximum score:
-        max_score = max(v
-                        for ballot in self.ballots
-                        for v in ballot.values())
-
-        print "Maximum score found in ballots = %d\n" % max_score
+        # Maximum Range score:
+        self.n_score = self.max_score + 1
 
         # Initialize lists and sets of candidates:
 
@@ -125,9 +128,6 @@ class Election(object):
         self.standing = self.candidates
         self.ordered_candidates=sorted(self.candidates)
 
-        # Maximum Range score:
-        self.max_score = max_score
-        self.n_score = self.max_score + 1
 
         if csv_output:
             if csv_output == '-':
@@ -178,13 +178,21 @@ class Election(object):
         keys = f.readline().rstrip().split(',')
         self.candidates.update(set(keys))
 
+        max_score = 0
+
         # Following lines are the ballots:
 	# A completely empty ballot could be construed as a vote for
 	# "None of the Above".  Depending on how votes are counted, this could
 	# force a run-off.
         for line in f:
             ballot = Ballot(line,keys,offset_score)
+            max_score = max(max_score, max(ballot.values()))
 	    self.ballots.append(ballot)
+
+        print "Maximum score found in CSV input = %d" % max_score
+
+        self.max_score = max(self.max_score,max_score)
+        print "Maximum score after CSV ballots merged = %d\n" % self.max_score
 
         if not stdin:
             f.close()
@@ -565,7 +573,7 @@ for the respective candidates as ballots on following lines.
     csv_input = opts.csv_input
     csv_output = opts.csv_output
     if (csv_input == "-"):
-        print "Reading CSV input from stdin\n\n"
+        print "Reading CSV input from stdin"
     else:
         if not os.path.isfile(csv_input):
             print "\nError, %s file does not exist\n" % csv_input
@@ -582,8 +590,10 @@ for the respective candidates as ballots on following lines.
             parser.print_help()
             sys.exit(1)
 
+        print "Reading CSV input from", csv_input
+
     if (csv_output == "-"):
-        print "Writing CSV input to stdout\n\n"
+        print "Appending CSV output to stdout\n"
     else:
 
         ext = os.path.splitext(csv_output)[1]
@@ -595,6 +605,8 @@ for the respective candidates as ballots on following lines.
             print "\nError, %s CSV output file does not have .csv or .CSV extension\n" % opts.csv_output
             parser.print_help()
             sys.exit(1)
+
+        print "Writing CSV output to", csv_output, "\n"
 
     election = Election(nseats=opts.nseats,
                         csv_input=csv_input,
