@@ -242,7 +242,9 @@ standing candidate, and keep track of weighted total vote.
             if rescale > 0.0:
                 standing = set(ballot.keys()) & self.standing
                 n = len(standing)
-                if n > 0:
+                if n == 0:
+                    ballot.rescale == 0.0 # Ignore this ballot next time
+                else:
                     total_vote += rescale
                     for c in standing:
                         score = ballot[c]
@@ -287,25 +289,24 @@ standing candidate, and keep track of weighted total vote.
 	# pairs, in reverse order of scoresum
 	ordered_scores = reverse_sort_dict(total)
 
-        # We now know the winner of this round:
+        # Extract winner of this round:
 	(winner, win_score) = ordered_scores[0]
+	csv_line = self.print_running_total(ordered_scores)
 
-	# ... and the corresponding locksum:
-	lockval = locksum[winner]
-
+        # Check for tied winning scores:
 	tied_scores = dict([(cand,score)
 			    for cand, score in total.iteritems()
 			    if score == win_score])
 
-	csv_line = self.print_running_total(ordered_scores)
-
-        # Check for tied winning scores:
-	# (not doing anything at this point ...)
         if len(tied_scores) > 1:
+            # (not doing anything at this point ...)
             print "\nUh-oh!  There is a tie!"
             print "Tied candidates:"
             for c, score in tied_scores.iteritems():
                 print "\t%s: %g" % (c, score)
+
+	# Find the winner's corresponding locksum:
+	lockval = locksum[winner]
 
 	if (win_score >= self.quota):
 	    csv_line += ",Seating %s; Locksum = %.5g\n" % (winner, lockval)
