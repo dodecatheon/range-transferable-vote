@@ -36,8 +36,7 @@ Differences between RTV and Quinn's Approval Transferable Vote:
  * Quinn's Approval Transferable Vote makes its over-quota transfer based
    on a whole approval vote.
 
-   RTV increases the amount of transfer inversely in proportion to the ballot
-   score for the winner.
+   RTV uses up a ballot in proportion to the ballot score for the winner
 
    In other words, as a ballot's score for the seat winner goes toward zero,
    the amount of strength lost by voting for that candidate also goes to zero.
@@ -45,47 +44,52 @@ Differences between RTV and Quinn's Approval Transferable Vote:
    This reduces the vote-loss penalty for giving partial approval to
    compromise candidates, and is another disincentive against truncation.
 
- * This implementation of RTV has options to use five different quotas:
+ * This implementation of RTV has options to use four different quotas:
+
+   - Stern = (Nvotes + 1.0) / (Nseats + 1.0)
+
+     	     This is essentially the Droop quota, based on Nvotes *
+             (Nseats+1) votes, then divided by (Nseats+1).  It is
+             slightly smaller than traditional Droop in most cases,
+             but satisfies two criteria better than traditional Droop,
+             for odd numbers of seats:
+
+	     1) If a group of candidates are supported by a majority
+             of voters, they will win a majority of seats.
+
+	     2) After Nseats winners are seated, the remaining vote not
+	     yet transferred will be less than one quota.  Therefore, it
+	     is mathematically impossible to seat more than Nseats winners.
+
+	     In the single winner case, the Stern quota would
+             effectively require the same number of votes to exceed
+             the quota as traditional Droop.  For example, with 100 votes,
+	     the quota is 101/2 = 50.5, a majority.
 
    - Droop = floor( Nvotes / (Nseats + 1.0)) + 1.0
 
+             This quota was designed to meet the same criteria as the
+	     Stern quota, but because it was used before fractional
+	     vote transfer became practical, it can never be a non-integer.
+
    - Hare  = Nvotes / Nseats
 
-   - Droop-nseats = Droop quota, based on Nvotes * Nseats votes, then divided
-                    by Nseats.  It is slightly smaller than traditional Droop
-                    in some cases, but still preserves the Droop majority
-                    constraint and is identical for single-winner.
+             This quota is most representational for smaller parties, but
+	     the last seat will be chosen in plurality with less than
+	     a full quota of votes.
 
-                    It is could be considered the Droop quota if you are
-                    counting in Cumulative Vote style, with Nseats votes per
-                    voter.
+   - Hagenbach-Bischoff, the quota used by Quinn, = Nvotes / (Nseats + 1.0)
 
-   - Droop-max-score =
+             The H-B quota may theoretically lead to issues such as
 
-                    Droop quota, based on Nvotes * max_score votes, then
-                    divided by max_score.
+             (1) a non-majority (less than 50% + one vote) controlling
+                 half of the seats, or
 
-                    It is the Droop quota for total scores in Range Voting
-                    style, adding up scores per candidate from every ballot,
-                    then transformed to ballot-count style.
+             (2) More than Nseats winners being seated with full quota.
 
-                    In the single winner case, it would effectively require
-                    the same number of votes to exceed the quota as traditional
-                    Droop.
+             Neither of these situations can occur with Stern, Droop or Hare.
 
-   - Hagenbach-Bischoff, the quota used by Quinn = Nvotes / (Nseats + 1.0)
-
-                    The H-B quota may lead to issues such as
-
-                    (1) a non-majority (less than 50% + one vote) controlling
-                        half of the seats, or
-
-                    (2) enough unused votes left over to elect another seat.
-
-                    Neither of these can occur with Droop or any of its
-                    variants.
-
-   The default is traditional Droop, to follow standard STV practice.
+   The default quota is Stern.
 
 Range scale:
 
@@ -269,25 +273,24 @@ Here's how to run them:
 
 June 2011 example from http://rangevoting.org/June2011RealWorldRRVvotes.txt
 
-  ./rtv.py -n 9 -q droop-max-score -i june2011.csv -o june2011_output.csv
+  ./rtv.py -n 9 -i june2011.csv -o june2011_output.csv
 
-To duplicate the requirements of choosing 11 winners, you can do
+To duplicate the election's requirements of choosing 11 winners, you can do
 
-  ./rtv.py -n 11 -q droop-max-score -i june2011.csv -o june2011_output.csv
+  ./rtv.py -n 11 -i june2011.csv -o june2011_output.csv
 
-In both these cases, I think it is preferable to use either Droop-nseats or
-Droop-max-score instead of standard Droop, because standard Droop has a quota
-of 4.0 in both the 9-winner and 11-winner case.  In other words, Droop is too
-granular when the quota is small.  With all Droop variants, the quota is 4 for
-9-winner case.  For Droop-nseats, the 11-winner quota is 3.2727..., and for
-Droop-max-score the quota is 3.33....
-
+In both these cases, I think it is preferable to use the Stern quota
+instead of standard Droop, because standard Droop has a quota of 4.0
+in both the 9-winner and 11-winner case.  In other words, Droop is too
+granular for smaller numbers of voters or large numbers of seats, and
+leads to unexpected behavior.  With Stern, the quota is 4.0 for
+9-winner case, and 40/12 = 3.333... for the 11-winner case.
 
 
 Stephen Unger's STV example, from http://rangevoting.org/STVPRunger.html
 
-  ./rtv.py -n 3 -q droop -i unger.csv -o     unger_output.csv
-  ./rtv.py -n 3 -q droop -i unger_new.csv -o unger_new_output.csv
+  ./rtv.py -n 3 -i unger.csv -o     unger_output.csv
+  ./rtv.py -n 3 -i unger_new.csv -o unger_new_output.csv
 
 [Note:  I've adjusted ratings so that all non-zero scores are above neutral]
 
@@ -313,7 +316,7 @@ You can test an election with one or more candidates excluded using the Unix
 tool 'cut'.  Here's the first example, excluding candidate '108':
 
   cut -f1-7,9- -d, june2011.csv | \
-  ./rtv.py -n 9 -q droop -i - -o june2011_excluding_108_output.csv
+  ./rtv.py -n 9 -i - -o june2011_excluding_108_output.csv
 
 
 Increasing scores:
@@ -357,7 +360,7 @@ june2011.csv input, for example, you enter the following two statements:
 election = Election(nseats=9,
                     csv_input='-',
                     csv_output='-',
-                    qtype='droop')
+                    qtype='stern')
 
 election.run_election()
 
