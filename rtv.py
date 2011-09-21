@@ -24,39 +24,35 @@ DEFAULT_NSEATS = 7
 def reverse_sort_dict(d):
     return sorted(d.iteritems(), key=itemgetter(1), reverse=True)
 
-qtypes = ['droop',
+qtypes = ['stern',
+          'droop',
           'hare',
-          'droop-nseats',
-          'droop-max-score',
           'hagenbach-bischoff']
 
 # Set up for Hare or Droop quotas:
 def calc_quota(n,
                nseats=DEFAULT_NSEATS,
                max_score=DEFAULT_MAX_SCORE,
-               qtype='droop'):
+               qtype='stern'):
     """\
     Return the quota based on qtype:
 
+    'stern'              => Stern = (Nvotes + 1)/(Nseats + 1)
     'droop'              => Droop = int(Nvotes / (Nseats + 1)) + 1
     'hare'               => Hare  = Nvotes / Nseats
-    'droop-nseats'       => Droop with Nvotes*Nseats votes,
-                            then divide by Nseats.
-    'droop-max-score'    => Droop with Nvotes*max_score votes,
-                            then divide by max_score
     'hagenbach-bischoff' => Nvotes / (Nseats + 1)
     """
 
     fn = float(n)
+    fnp1 = fn + 1.0
     fs = float(nseats)
     fm = float(max_score)
     fsp1 = fs + 1.0
 
     # We implement a CASE switch construction using a dict:
-    return {'droop':              (float(int(fn/fsp1)) + 1.0),
+    return {'stern':              (fnp1/fsp1),
+            'droop':              (float(int(fn/fsp1)) + 1.0),
             'hare':               (fn/fs),
-            'droop-nseats':       ((float(float(int(fn*fs/fsp1)) + 1.0))/fs),
-            'droop-max-score':    ((float(float(int(fn*fm/fsp1)) + 1.0))/fm),
             'hagenbach-bischoff': (fn/fsp1)}[qtype]
 
 class Ballot(dict):
@@ -80,7 +76,7 @@ class Election(object):
                  candidates=set([]),
                  csv_input=None,
                  csv_output=None,
-                 qtype='droop',
+                 qtype='stern',
                  nseats=DEFAULT_NSEATS,
                  offset_score=0):
         "Initialize from a list of ballots or a CSV input file"
@@ -437,7 +433,7 @@ june2011.csv input, for example, you enter the following two statements:
 election = Election(nseats=9,
                     csv_input='-',
                     csv_output='-',
-                    qtype='droop')
+                    qtype='stern')
 
 election.run_election()
 
@@ -485,32 +481,44 @@ for the respective candidates as ballots on following lines.
     parser.add_option('-q',
                       '--quota-type',
                       type='string',
-                      default='droop',
+                      default='stern',
                       help=fill(dedent("""\
                       Quota type used in election.
 
-                      'droop' = Droop   = Nballots /(Nseats + 1) + 1,
-                                          dropping fractional part.
+                      'stern'           
 
-                      'hare'  = Hare    = Number of ballots divided by number
-                                          of seats.
+                      = (Nballots+1) / (Nseats+1).
 
-                      'droop-nseats'    = Droop based on Nballots * Nseats
-                                          votes, then divide by Nseats.
-                                          Reduces to traditional Droop
-                                          when Nseats is 1.
+                      Equivalent to Droop based on Nballots *
+                      (Nseats+1) votes, then divided by (Nseats+1).
+                      Smaller than traditional Droop but larger than
+                      Hagenbach-Bischoff.  Satisfies two criteria: a
+                      majority bloc will capture a majority of the
+                      seats; after seating Nseats winners, the
+                      remaining vote is smaller than a quota.
 
-                      'droop-max-score' = Droop based on Nballots * max_score
-                                          votes, then divide by max_score.
+                      'droop' = Droop   
 
-                      'hagenbach-bischoff' = Nballots / (Nseats + 1).
-                                             Technically, this may allow
-                                             exactly 50% of the ballots to
-                                             select a majority of seats,
-                                             or the left-out votes could
-                                             meet quota for an extra seat.
+                       = Nballots /(Nseats + 1) + 1, dropping
+                       fractional part.
 
-                      [Default: droop]""")))
+                       Traditionally used for STV.  Developed before
+                       fractional transfer methods could be used.
+
+                      'hare'  = Hare    
+
+                      = Number of ballots divided by number of seats.
+                      Most representational, but last seat will be
+                      chosen with less than a full quota.
+
+                      'hagenbach-bischoff' 
+
+                      = Nballots / (Nseats + 1).  Technically, this
+                      may allow exactly 50% of the ballots to select a
+                      majority of seats, or the left-out votes could
+                      meet quota for an extra seat.
+
+                      [Default: stern]""")))
 
     parser.add_option('-i',
                       '--csv-input',
