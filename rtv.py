@@ -40,7 +40,7 @@ def calc_quota(n,
     'stern'              => Stern = (Nvotes + 1)/(Nseats + 1)
     'droop'              => Droop = int(Nvotes / (Nseats + 1)) + 1
     'hare'               => Hare  = Nvotes / Nseats
-    'hagenbach-bischoff' => Nvotes / (Nseats + 1)
+    'hagenbach-bischoff' => Nvotes / (Nseats + 1), rounded up to nearest 0.01
     """
 
     fn = float(n)
@@ -53,7 +53,7 @@ def calc_quota(n,
     return {'stern':              (fnp1/fsp1),
             'droop':              (float(int(fn/fsp1)) + 1.0),
             'hare':               (fn/fs),
-            'hagenbach-bischoff': (fn/fsp1)}[qtype]
+            'hagenbach-bischoff': (float(int(100.0*fn/fsp1)+1)/100.0)}[qtype]
 
 class Ballot(dict):
     def __init__(self,csv_string='',cand_list=[],offset_score=0):
@@ -486,40 +486,41 @@ for the respective candidates as ballots on following lines.
                       help=fill(dedent("""\
                       Quota type used in election.
 
-                      'stern'           
+                      'stern' = (Nballots+1) / (Nseats+1).
 
-                      = (Nballots+1) / (Nseats+1).
+                      Equivalent to
 
-                      Equivalent to Droop based on Nballots *
-                      (Nseats+1) votes, then divided by (Nseats+1).
-                      Smaller than traditional Droop but larger than
-                      Hagenbach-Bischoff.  Satisfies two criteria: a
-                      majority bloc will capture a majority of the
-                      seats; after seating Nseats winners, the
-                      remaining vote is smaller than a quota.
+                      Droop(Nballots*(Nseats+1),Nseats) / (Nseats+1)
 
-                      'droop' = Droop   
+                      Sometimes smaller than traditional Droop but
+                      larger than Hagenbach-Bischoff.  Satisfies two
+                      criteria: a majority bloc will capture a
+                      majority of the seats; after seating Nseats
+                      winners, the remaining vote is smaller than a
+                      quota.
 
-                       = Nballots /(Nseats + 1) + 1, dropping
+                      'droop' = Nballots /(Nseats + 1) + 1, dropping
                        fractional part.
 
-                       Traditionally used for STV.  Developed before
-                       fractional transfer methods could be used.
+                       Droop is traditionally used for STV.  Developed
+                       before fractional transfer methods could be
+                       used.
 
-                      'hare'  = Hare    
+                      'hare' = Nballots / Nseats.
 
-                      = Number of ballots divided by number of seats.
-                      Most representational, but last seat will be
-                      chosen with less than a full quota.
+                      Hare is the most representational, but last seat
+                      will be chosen with less than a full quota.
 
-                      'hagenbach-bischoff' 
+                      'hagenbach-bischoff'
 
                       = Nballots / (Nseats + 1).  Technically, this
                       may allow exactly 50% of the ballots to select a
                       majority of seats, or the left-out votes could
-                      meet quota for an extra seat.
+                      meet quota for an extra seat.  In this implementation,
+                      we round up to the nearest hundredth of a vote,
+                      to prevent the extra seat paradox.
 
-                      [Default: stern]""")))
+                      [Default: 'stern']""")))
 
     parser.add_option('-i',
                       '--csv-input',
