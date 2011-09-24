@@ -50,22 +50,22 @@ Differences between RTV and Quinn's Approval Transferable Vote:
 
    - Droop = Droop(N,M) = floor(N/(M + 1.0)) + 1.0
 
-             This quota was designed to meet the same criteria as the Stern
+             This quota was designed to meet the same criteria as the Simple
 	     quota, but because it was used before fractional vote transfer
 	     became practical, it can never be a non-integer.
 
              For small numbers of ballots or quota sizes < 10, Droop doesn't
              have sufficient precision.  In those situations, we recommend
-             using Stern or Hagenbach-Bischoff quotas.
+             using Simple or Hagenbach-Bischoff quotas.
 
-             For larger numbers of ballots and larger quotas, Droop, Stern and
+             For larger numbers of ballots and larger quotas, Droop, Simple and
              Hagenbach-Bischoff are nearly identical.
 
-   - Stern = (N + 1.0) / (M + 1.0)
+   - Simple = (N + 1.0) / (M + 1.0)
 
-     	     Stern = Droop(N*(M+1),M) / (M + 1.0)
+     	     Simple = Droop(N*(M+1),M) / (M + 1.0)
 
-             The Stern quota is less than Droop in most cases, but satisfies
+             The Simple quota is less than Droop in most cases, but satisfies
              two criteria better than traditional Droop, for odd numbers of
              seats:
 
@@ -77,10 +77,10 @@ Differences between RTV and Quinn's Approval Transferable Vote:
 	     transferred will be less than one quota.  Therefore, it is
 	     mathematically impossible to seat more than M winners.
 
-	     In the single winner case, the Stern quota would effectively
+	     In the single winner case, the Simple quota would effectively
              require the same number of votes to exceed the quota as
              traditional Droop.  For example, with 100 votes, the quota is
-             101/2 = 50.5, a majority.  Note that under Stern the vote
+             101/2 = 50.5, a majority.  Note that under Simple the vote
              required to win a majority of seats is 50% of N plus one-half of
              one ballot strength for any number of winners.
 
@@ -101,14 +101,14 @@ Differences between RTV and Quinn's Approval Transferable Vote:
 
              (2) More than M winners being seated with full quota.
 
-             Neither of these situations can occur with Stern, Droop or Hare.
+             Neither of these situations can occur with Simple, Droop or Hare.
 
              In this implementation of RTV, we round up the H-B quota to the
              nearest hundredth, to prevent both these problems.  I.e.,
 
              H-B quota = Droop(N*100,M) / 100.0
 
-   The default quota is Stern.
+   The default quota is Simple.
 
 Range scale:
 
@@ -301,11 +301,11 @@ To duplicate the election's requirements of choosing 11 winners, you can do
 
   ./rtv.py -n 11 -i june2011.csv -o june2011_output.csv
 
-In both these cases, I think it is preferable to use the Stern quota
+In both these cases, I think it is preferable to use the Simple quota
 instead of standard Droop, because standard Droop has a quota of 4.0
 in both the 9-winner and 11-winner case.  In other words, Droop is too
 granular for smaller numbers of voters or large numbers of seats, and
-leads to unexpected behavior.  With Stern, the quota is 4.0 for
+leads to unexpected behavior.  With Simple, the quota is 4.0 for
 9-winner case, and 40/12 = 3.333... for the 11-winner case.
 
 
@@ -382,7 +382,7 @@ june2011.csv input, for example, you enter the following two statements:
 election = Election(nseats=9,
                     csv_input='-',
                     csv_output='-',
-                    qtype='stern')
+                    qtype='simple')
 
 election.run_election()
 

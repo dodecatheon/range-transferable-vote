@@ -24,7 +24,7 @@ DEFAULT_NSEATS = 7
 def reverse_sort_dict(d):
     return sorted(d.iteritems(), key=itemgetter(1), reverse=True)
 
-qtypes = ['stern',
+qtypes = ['simple',
           'droop',
           'hare',
           'hagenbach-bischoff']
@@ -33,11 +33,11 @@ qtypes = ['stern',
 def calc_quota(n,
                nseats=DEFAULT_NSEATS,
                max_score=DEFAULT_MAX_SCORE,
-               qtype='stern'):
+               qtype='simple'):
     """\
     Return the quota based on qtype:
 
-    'stern'              => Stern = (Nvotes + 1)/(Nseats + 1)
+    'simple'             => simple = (Nvotes + 1)/(Nseats + 1)
     'droop'              => Droop = int(Nvotes / (Nseats + 1)) + 1
     'hare'               => Hare  = Nvotes / Nseats
     'hagenbach-bischoff' => Nvotes / (Nseats + 1), rounded up to nearest 0.01
@@ -50,7 +50,7 @@ def calc_quota(n,
     fsp1 = fs + 1.0
 
     # We implement a CASE switch construction using a dict:
-    return {'stern':              (fnp1/fsp1),
+    return {'simple':             (fnp1/fsp1),
             'droop':              (float(int(fn/fsp1)) + 1.0),
             'hare':               (fn/fs),
             'hagenbach-bischoff': (float(int(100.0*fn/fsp1)+1)/100.0)}[qtype]
@@ -76,7 +76,7 @@ class Election(object):
                  candidates=set([]),
                  csv_input=None,
                  csv_output=None,
-                 qtype='stern',
+                 qtype='simple',
                  nseats=DEFAULT_NSEATS,
                  offset_score=0):
         "Initialize from a list of ballots or a CSV input file"
@@ -434,7 +434,7 @@ june2011.csv input, for example, you enter the following two statements:
 election = Election(nseats=9,
                     csv_input='-',
                     csv_output='-',
-                    qtype='stern')
+                    qtype='simple')
 
 election.run_election()
 
@@ -482,11 +482,11 @@ for the respective candidates as ballots on following lines.
     parser.add_option('-q',
                       '--quota-type',
                       type='string',
-                      default='stern',
+                      default='simple',
                       help=fill(dedent("""\
                       Quota type used in election.
 
-                      'stern' = (Nballots+1) / (Nseats+1).
+                      'simple' = (Nballots+1) / (Nseats+1).
 
                       Equivalent to
 
@@ -520,7 +520,7 @@ for the respective candidates as ballots on following lines.
                       we round up to the nearest hundredth of a vote,
                       to prevent the extra seat paradox.
 
-                      [Default: 'stern']""")))
+                      [Default: 'simple']""")))
 
     parser.add_option('-i',
                       '--csv-input',
