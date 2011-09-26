@@ -29,6 +29,12 @@ qtypes = ['easy',
           'hare',
           'hagenbach-bischoff']
 
+def droop_quota(n, m):
+    "Traditional Droop quota of (n,m), where n = number of votes and m = number of seats"
+    fn   = float(n)
+    fmp1 = float(m) + 1.0
+    return float(int(fn/fmp1)) + 1.0
+
 # Set up for Hare or Droop quotas:
 def calc_quota(n,
                nseats=DEFAULT_NSEATS,
@@ -37,9 +43,9 @@ def calc_quota(n,
     """\
     Return the quota based on qtype:
 
-    'easy'             => easy = (Nvotes + 1)/(Nseats + 1)
+    'easy'               => easy = (Nvotes + 1)/(Nseats + 1)
     'droop'              => Droop = int(Nvotes / (Nseats + 1)) + 1
-    'hare'               => Hare  = Nvotes / Nseats
+    'hare'               => Hare  = Nvotes / Nseats, rounded down to nearest 0.01
     'hagenbach-bischoff' => Nvotes / (Nseats + 1), rounded up to nearest 0.01
     """
 
@@ -50,10 +56,10 @@ def calc_quota(n,
     fsp1 = fs + 1.0
 
     # We implement a CASE switch construction using a dict:
-    return {'easy':             (fnp1/fsp1),
-            'droop':              (float(int(fn/fsp1)) + 1.0),
-            'hare':               (fn/fs),
-            'hagenbach-bischoff': (float(int(100.0*fn/fsp1)+1)/100.0)}[qtype]
+    return {'easy':               (fnp1/fsp1),
+            'droop':              (droop_quota(n,nseats)),
+            'hare':               (int(fn*100./fs-0.01)/100.),
+            'hagenbach-bischoff': (droop_quota(n*100,nseats)/100.0)}[qtype]
 
 class Ballot(dict):
     def __init__(self,csv_string='',cand_list=[],offset_score=0):
@@ -116,6 +122,7 @@ class Election(object):
 
         # Maximum Range score:
         self.n_score = self.max_score + 1
+        self.threshold = self.max_score
 
         # Initialize lists and sets of candidates:
 
@@ -172,6 +179,16 @@ class Election(object):
 
         # List of candidate names in the first line:
         keys = f.readline().rstrip().split(',')
+
+        # We have a special keyword for the first field.
+        # If it is 'Repeat', it means the first index on each line
+        # is the number of times that line should be counted repeatedly.
+        if keys[0] == 'Repeat':
+            do_repeat = True
+            keys.pop(0)
+        else:
+            do_repeat = False
+
         self.candidates.update(set(keys))
 
         max_score = 0
@@ -180,10 +197,18 @@ class Election(object):
 	# A completely empty ballot could be construed as a vote for
 	# "None of the Above".  Depending on how votes are counted, this could
 	# force a run-off.
-        for line in f:
-            ballot = Ballot(line,keys,offset_score)
+        for j, line in enumerate(f):
+            if do_repeat:
+                cstring, line = line.split(',',1)
+                count = int(cstring)
+                print "Line %d of file counted %d times" % (j, count)
+                for i in xrange(count):
+                    ballot = Ballot(line,keys,offset_score)
+                    self.ballots.append(ballot)
+            else:
+                ballot = Ballot(line,keys,offset_score)
+                self.ballots.append(ballot)
             max_score = max(max_score, max(ballot.values()))
-	    self.ballots.append(ballot)
 
         print "Maximum score found in CSV input = %d" % max_score
 
@@ -270,46 +295,59 @@ standing candidate, and keep track of weighted total vote.
         # Candidates we're calculating totals for:
         standing = totals[1].keys()
 
-        # Initial score sums for each candidate:
-        total = dict([(c,0.0) for c in standing])
-        locksum = dict([(c,0.0) for c in standing])
+        while (self.threshold > 0):
+            # Initial score sums for each candidate:
+            total = dict([(c,0.0) for c in standing])
+            locksum = dict([(c,0.0) for c in standing])
 
-        # For each ratings level, weight the increment to the score sum
-	# by the normalized score coefficient, beta:
-        for score in xrange(1,self.n_score):
-	    for c in standing:
-		total[c] += self.beta[score] * totals[score][c]
-		locksum[c] += self.beta[score] * locksums[score][c]
+            # For each ratings level, weight the increment to the score sum
+            # by the normalized score coefficient, beta:
+            for score in xrange(1,self.n_score):
+                for c in standing:
+                    total[c] += self.beta[score] * totals[score][c]
+                    locksum[c] += self.beta[score] * locksums[score][c]
 
-        # create a list of the score sum totals as (candidate, scoresum)
-	# pairs, in reverse order of scoresum
-	ordered_scores = reverse_sort_dict(total)
+            # create a list of the score sum totals as (candidate, scoresum)
+            # pairs, in reverse order of scoresum
+            ordered_scores = reverse_sort_dict(total)
 
-        # Extract winner of this round:
-	(winner, win_score) = ordered_scores[0]
-	csv_line = self.print_running_total(ordered_scores)
+            # Extract winner of this round:
+            (winner, win_score) = ordered_scores[0]
+            lockval = locksum[winner]
 
-        # Check for tied winning scores:
-	tied_scores = dict([(cand,score)
-			    for cand, score in total.iteritems()
-			    if score == win_score])
+            # Check for tied winning scores:
+            tied_scores = dict([(cand,score)
+                                for cand, score in total.iteritems()
+                                if score == win_score])
 
-        if len(tied_scores) > 1:
-            # (not doing anything at this point ...)
-            print "\nUh-oh!  There is a tie!"
-            print "Tied candidates:"
-            for c, score in tied_scores.iteritems():
-                print "\t%s: %g" % (c, score)
+            if len(tied_scores) > 1:
+                # (not doing anything at this point ...)
+                print "\nUh-oh!  There is a tie!"
+                print "Tied candidates:"
+                for c, score in tied_scores.iteritems():
+                    print "\t%s: %g" % (c, score)
+                print "For now, breaking tie in lexical order"
 
-	# Find the winner's corresponding locksum:
-	lockval = locksum[winner]
+            csv_line = self.print_running_total(ordered_scores)
+            if (win_score < self.quota and self.threshold > 1):
+                csv_line += ",Threshold = %d; Winner = %s, Quota not reached\n" % ( self.threshold, winner)
+                # Lower threshold and recount total and locksum
+                print "Highest score = %g is less than quota = %g" % (win_score, self.quota)
+                print "Decreasing threshold"
+                self.threshold -= 1
+                beta = [b for b in self.beta] # copy self.beta
+                beta.pop(1)                   # Remove smallest non-zero score
+                beta.append(1.0)              # Fill in end of beta with highest score
+                self.beta = beta              # Copy back to self.beta
+                self.csv_lines.append(csv_line)
 
-	if (win_score >= self.quota):
-	    csv_line += ",Seating %s; Locksum = %.5g\n" % (winner, lockval)
-	    self.csv_lines.append(csv_line)
-	else:
-	    csv_line += ",Seating %s; Quota not reached\n" % winner
-	    self.csv_lines.append(csv_line)
+            else:
+                if (win_score < self.quota):
+                    print "Winning score less than quota, but had to stop because threshold limit reached"
+
+                csv_line += ",Seating %s; Locksum = %.5g\n" % (winner, lockval)
+                self.csv_lines.append(csv_line)
+                break
 
         return winner, win_score, lockval
 
